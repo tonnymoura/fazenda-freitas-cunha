@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollReveal();
   initNavScroll();
   initCalculadora();
+  initLightbox();
+  initVideoExclusivePlay();
+  initFormValidationClear();
 });
 
 /* ─── MENU MOBILE ─── */
@@ -121,6 +124,13 @@ function setDiasPreset(dias) {
   }
 }
 
+function syncDiasPresetButtons(diasAtuais) {
+  document.querySelectorAll('.btn-preset').forEach((btn) => {
+    const presetVal = parseInt(btn.getAttribute('data-dias'), 10);
+    btn.classList.toggle('active', presetVal === diasAtuais);
+  });
+}
+
 function calcularSilagem() {
   const animalSelect = document.getElementById('calc-animal');
   const qtdInput = document.getElementById('calc-qtd');
@@ -132,6 +142,8 @@ function calcularSilagem() {
   const numAnimais = Math.max(1, parseInt(qtdInput.value, 10) || 1);
   const dias = Math.max(1, parseInt(diasInput.value, 10) || 1);
   const pesoSaco = PESO_SACO_CONFIRMADO;
+
+  syncDiasPresetButtons(dias);
 
   const infoAnimal = CONSUMO_BASE[tipo] || CONSUMO_BASE['corte'];
   const kgPorAnimalDia = infoAnimal.mediaKg;
@@ -199,6 +211,7 @@ function aplicarCalculoNoFormulario() {
   if (fInteresse) {
     fInteresse.value = 'Silagem de Milho';
     atualizarFormInteresse();
+    destacarCampoSelecionado(fInteresse);
   }
 
   const fQtd = document.getElementById('f-qtd');
@@ -235,6 +248,14 @@ function toggleFaq(btn) {
 }
 
 /* ─── CONTROLE DINÂMICO DO FORMULÁRIO ─── */
+function destacarCampoSelecionado(el) {
+  if (!el) return;
+  el.classList.remove('select-highlight');
+  void el.offsetWidth;
+  el.classList.add('select-highlight');
+  setTimeout(() => el.classList.remove('select-highlight'), 1800);
+}
+
 function atualizarFormInteresse() {
   const selInteresse = document.getElementById('f-interesse');
   const grpRebanho = document.getElementById('grp-rebanho');
@@ -278,6 +299,7 @@ function selecionarServicoDrone() {
   if (sel) {
     sel.value = 'Serviço com Drone Agrícola';
     atualizarFormInteresse();
+    destacarCampoSelecionado(sel);
   }
   const contato = document.getElementById('contato');
   if (contato) contato.scrollIntoView({ behavior: 'smooth' });
@@ -288,6 +310,7 @@ function selecionarServicoPecuaria() {
   if (sel) {
     sel.value = 'Pecuária de Corte';
     atualizarFormInteresse();
+    destacarCampoSelecionado(sel);
   }
   const contato = document.getElementById('contato');
   if (contato) contato.scrollIntoView({ behavior: 'smooth' });
@@ -298,24 +321,65 @@ function selecionarServicoArrendamento() {
   if (sel) {
     sel.value = 'Arrendamento de Pasto';
     atualizarFormInteresse();
+    destacarCampoSelecionado(sel);
   }
   const contato = document.getElementById('contato');
   if (contato) contato.scrollIntoView({ behavior: 'smooth' });
 }
 
-/* ─── FORMULÁRIO → WHATSAPP (MENSAGEM LIMPA E PROFISSIONAL) ─── */
+/* ─── VALIDAÇÃO VISUAL E ENVIO DO FORMULÁRIO → WHATSAPP ─── */
+function initFormValidationClear() {
+  const campos = ['f-nome', 'f-cidade'];
+  campos.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        el.classList.remove('input-error');
+        const feedback = document.getElementById('form-feedback');
+        if (feedback) {
+          feedback.classList.remove('visible');
+          feedback.textContent = '';
+        }
+      });
+    }
+  });
+}
+
 function enviarWpp() {
   const interesseEl = document.getElementById('f-interesse');
   const interesse = interesseEl ? interesseEl.value : 'Silagem de Milho';
-  const nome = document.getElementById('f-nome').value.trim();
-  const cidade = document.getElementById('f-cidade').value.trim();
+  const nomeInput = document.getElementById('f-nome');
+  const cidadeInput = document.getElementById('f-cidade');
+  const feedback = document.getElementById('form-feedback');
+
+  const nome = nomeInput ? nomeInput.value.trim() : '';
+  const cidade = cidadeInput ? cidadeInput.value.trim() : '';
   const rebanho = document.getElementById('f-rebanho') ? document.getElementById('f-rebanho').value : '';
   const qtd = document.getElementById('f-qtd') ? document.getElementById('f-qtd').value : '';
   const duvida = document.getElementById('f-duvida') ? document.getElementById('f-duvida').value.trim() : '';
 
   if (!nome || !cidade) {
-    alert('Por favor, informe seu nome e sua localidade.');
+    if (nomeInput) nomeInput.classList.toggle('input-error', !nome);
+    if (cidadeInput) cidadeInput.classList.toggle('input-error', !cidade);
+    if (feedback) {
+      feedback.textContent = !nome && !cidade
+        ? 'Por favor, preencha seu nome e sua localidade para enviarmos o atendimento pelo WhatsApp.'
+        : !nome
+          ? 'Por favor, informe seu nome ou nome da propriedade.'
+          : 'Por favor, informe seu município ou localidade.';
+      feedback.classList.add('visible');
+    }
+    if (!nome && nomeInput) {
+      nomeInput.focus();
+    } else if (!cidade && cidadeInput) {
+      cidadeInput.focus();
+    }
     return;
+  }
+
+  if (feedback) {
+    feedback.classList.remove('visible');
+    feedback.textContent = '';
   }
 
   let msg = '';
@@ -355,3 +419,92 @@ function enviarWpp() {
   const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   window.open(url, '_blank');
 }
+
+/* ─── CONTROLE DE VÍDEOS (PAUSAR OUTROS AO REPRODUZIR) ─── */
+function initVideoExclusivePlay() {
+  const videos = document.querySelectorAll('video');
+  videos.forEach((video) => {
+    video.addEventListener('play', () => {
+      videos.forEach((other) => {
+        if (other !== video && !other.paused) {
+          other.pause();
+        }
+      });
+    });
+  });
+}
+
+/* ─── LIGHTBOX MODAL (GALERIA, FLYERS E FOTOS DE SILAGEM) ─── */
+let lightboxItems = [];
+let currentLightboxIndex = 0;
+
+function initLightbox() {
+  const triggers = document.querySelectorAll('.lightbox-trigger[data-lightbox]');
+  lightboxItems = Array.from(triggers).map((el) => ({
+    src: el.getAttribute('data-lightbox'),
+    caption: el.getAttribute('data-caption') || ''
+  }));
+
+  triggers.forEach((el, index) => {
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('role', 'button');
+    el.addEventListener('click', () => openLightboxByIndex(index));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openLightboxByIndex(index);
+      }
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('lightboxModal');
+    if (!modal || !modal.classList.contains('open')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') navigateLightbox(-1);
+    if (e.key === 'ArrowRight') navigateLightbox(1);
+  });
+}
+
+function openLightboxByIndex(index) {
+  if (!lightboxItems.length) return;
+  currentLightboxIndex = (index + lightboxItems.length) % lightboxItems.length;
+  const item = lightboxItems[currentLightboxIndex];
+
+  const modal = document.getElementById('lightboxModal');
+  const img = document.getElementById('lightboxImg');
+  const captionText = document.getElementById('lightboxCaptionText');
+  const counter = document.getElementById('lightboxCounter');
+
+  if (!modal || !img) return;
+  img.src = item.src;
+  img.alt = item.caption || 'Imagem ampliada — Fazenda Freitas e Cunha';
+  if (captionText) {
+    captionText.textContent = item.caption;
+  }
+  if (counter) {
+    counter.textContent = `${currentLightboxIndex + 1} / ${lightboxItems.length}`;
+  }
+
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function navigateLightbox(direction) {
+  openLightboxByIndex(currentLightboxIndex + direction);
+}
+
+function closeLightbox() {
+  const modal = document.getElementById('lightboxModal');
+  const img = document.getElementById('lightboxImg');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  if (img) {
+    img.src = '';
+  }
+  document.body.style.overflow = '';
+}
+
